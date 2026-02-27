@@ -2,9 +2,9 @@
 This program can Processes files of any size —
 from a laptop to a 100 GB+ AWS Glue cluster.
 
-
+# Pre requisite: python 3.9+ , aws cli and git should be installed.(detailed steps provided in execution steps document with screenshots)
 ## local set up
-git clone 
+git clone https://github.com/shiv141231/assignment_repo.git
 cd assignment_repo
 
 # To run with chunked processor by setting this param  before running the below command  $env:PROCESSOR = "chunked"   please un-comment line number 13 in main PROCESSOR = os.getenv("PROCESSOR", "chunked") 
@@ -13,7 +13,7 @@ python main.py data.sql
 
 ## Running Test cases
 
-# All tests without spark
+# All tests
 
 python -m unittest tests/test_all.py -v
 

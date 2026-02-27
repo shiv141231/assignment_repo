@@ -1,0 +1,10 @@
+# Add a .gitignore
+echo "__pycache__/
+*.pyc
+*.pyo
+src.zip" >> .gitignore
+
+git rm -r --cached src/__pycache__/ tests/__pycache__/
+git add .gitignore
+git commit -m "Remove pycache files and add .gitignore"
+git push
