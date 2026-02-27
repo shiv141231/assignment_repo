@@ -6,7 +6,7 @@
 #
 # Usage:
 #   ./infra/deploy_ec2.sh
-#   PROCESSOR=spark ./infra/deploy_ec2.sh   # for scaling up with spark
+#   PROCESSOR=spark ./infra/deploy_ec2.sh   # only for scaling up with spark
 # =============================================================================
 set -euo pipefail
 
