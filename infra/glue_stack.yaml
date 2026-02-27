@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Assignment — AWS Glue PySpark Job
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: assignment-glue-stack
+  DataBucketName:
+    Type: String
+    Default: assignment-bucket-ss
+  ScriptBucketName:
+    Type: String
+    Default: assignment-script-bucket
+  WorkerType:
+    Type: String
+    Default: G.1X
+    AllowedValues: [G.1X, G.2X]
+  NumberOfWorkers:
+    Type: Number
+    Default: 2
+  InputPrefix:
+    Type: String
+    Default: input/
+  OutputPrefix:
+    Type: String
+    Default: output/
+
+Resources:
+
+  GlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "assignment-glue-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: glue.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:ListBucket]
+                Resource:
+                  - !Sub "arn:aws:s3:::${DataBucketName}"
+                  - !Sub "arn:aws:s3:::${DataBucketName}/*"
+
+  GlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-job"
+      Role: !GetAtt GlueRole.Arn
+      GlueVersion: "4.0"
+      WorkerType: !Ref WorkerType
+      NumberOfWorkers: !Ref NumberOfWorkers
+      Timeout: 120
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub "s3://${ScriptBucketName}/scripts/glue_job.py"
+        PythonVersion: "3"
+      DefaultArguments:
+        "--INPUT_PATH":  !Sub "s3://${DataBucketName}/${InputPrefix}"
+        "--OUTPUT_PATH": !Sub "s3://${DataBucketName}/${OutputPrefix}"
+        "--extra-py-files": !Sub "s3://${ScriptBucketName}/scripts/src.zip"
+        "--job-language": "python"
+        "--enable-metrics": "true"
+        "--enable-continuous-cloudwatch-log": "true"
+        "--conf": !Join
+          - " --conf "
+          - - "spark.sql.adaptive.enabled=true"
+            - "spark.sql.adaptive.coalescePartitions.enabled=true"
+            - "spark.sql.adaptive.skewJoin.enabled=true"
+      ExecutionProperty:
+        MaxConcurrentRuns: 3
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws-glue/jobs/${ProjectName}-job"
+      RetentionInDays: 30
+
+  FailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-failure"
+      Namespace: Glue
+      MetricName: glue.driver.aggregate.numFailedTasks
+      Dimensions:
+        - Name: JobName
+          Value: !Ref GlueJob
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  DailyTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Name: !Sub "${ProjectName}-daily"
+      Type: SCHEDULED
+      Schedule: "cron(0 6 * * ? *)"
+      StartOnCreation: false
+      Actions:
+        - JobName: !Ref GlueJob
+
+Outputs:
+  GlueJobName:
+    Value: !Ref GlueJob
+  InputLocation:
+    Value: !Sub "s3://${DataBucketName}/${InputPrefix}"
+  OutputLocation:
+    Value: !Sub "s3://${DataBucketName}/${OutputPrefix}"
